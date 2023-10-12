@@ -17,6 +17,7 @@ from model import PairWiseModel
 from sklearn.metrics import roc_auc_score
 import random
 import os
+# 尝试加载cpp计算文件
 try:
     from cppimport import imp_from_filepath
     from os.path import join, dirname
@@ -28,7 +29,7 @@ except:
     world.cprint("Cpp extension not loaded")
     sample_ext = False
 
-
+#实现BPR (Bayesian Personalized Ranking) 的损失函数和优化过程
 class BPRLoss:
     def __init__(self,
                  recmodel : PairWiseModel,
@@ -38,7 +39,7 @@ class BPRLoss:
         self.lr = config['lr']
         self.opt = optim.Adam(recmodel.parameters(), lr=self.lr)
 
-    def stageOne(self, users, pos, neg):
+    def stageOne(self, users, pos, neg): #实现了模型的一次训练迭代过程:
         loss, reg_loss = self.model.bpr_loss(users, pos, neg)
         reg_loss = reg_loss*self.weight_decay
         loss = loss + reg_loss
@@ -49,7 +50,7 @@ class BPRLoss:
 
         return loss.cpu().item()
 
-
+# 从所有物品中均匀随机地对用户产生负样本
 def UniformSample_original(dataset, neg_ratio = 1):
     dataset : BasicDataset
     allPos = dataset.allPos
@@ -98,7 +99,7 @@ def UniformSample_original_python(dataset):
 # ===================end samplers==========================
 # =====================utils====================================
 
-def set_seed(seed):
+def set_seed(seed):   #设置随机种子
     np.random.seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
@@ -125,7 +126,7 @@ def minibatch(*tensors, **kwargs):
             yield tuple(x[i:i + batch_size] for x in tensors)
 
 
-def shuffle(*arrays, **kwargs):
+def shuffle(*arrays, **kwargs):  #对数组进行随机打乱
 
     require_indices = kwargs.get('indices', False)
 
@@ -211,6 +212,7 @@ class timer:
 
 # ====================Metrics==============================
 # =========================================================
+# 计算召回率（Recall）和精确度（Precision）的函数
 def RecallPrecision_ATk(test_data, r, k):
     """
     test_data should be a list? cause users may have different amount of pos items. shape (test_batch, k)
@@ -224,7 +226,7 @@ def RecallPrecision_ATk(test_data, r, k):
     precis = np.sum(right_pred)/precis_n
     return {'recall': recall, 'precision': precis}
 
-
+# 计算平均倒数排名
 def MRRatK_r(r, k):
     """
     Mean Reciprocal Rank
@@ -235,6 +237,7 @@ def MRRatK_r(r, k):
     pred_data = pred_data.sum(1)
     return np.sum(pred_data)
 
+# 计算NGDC
 def NDCGatK_r(test_data,r,k):
     """
     Normalized Discounted Cumulative Gain

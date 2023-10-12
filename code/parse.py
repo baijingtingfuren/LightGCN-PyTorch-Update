@@ -7,6 +7,7 @@ Xiangnan He et al. LightGCN: Simplifying and Powering Graph Convolution Network 
 '''
 import argparse
 
+# cd code && python main.py --decay=1e-4 --lr=0.001 --layer=3 --seed=2020 --dataset="gowalla" --topks="[20]" --recdim=64
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Go lightGCN")

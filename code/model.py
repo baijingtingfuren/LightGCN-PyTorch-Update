@@ -81,6 +81,7 @@ class PureMF(BasicModel):
         return self.f(scores)
 
 class LightGCN(BasicModel):
+    # 初始化了该类的一些属性，并调用了__init_weight方法。
     def __init__(self, 
                  config:dict, 
                  dataset:BasicDataset):
@@ -89,6 +90,7 @@ class LightGCN(BasicModel):
         self.dataset : dataloader.BasicDataset = dataset
         self.__init_weight()
 
+    # 始化了用户和物品的嵌入权重，并选择了初始化的方法（使用正态分布或预训练的权重）。
     def __init_weight(self):
         self.num_users  = self.dataset.n_users
         self.num_items  = self.dataset.m_items
@@ -117,6 +119,8 @@ class LightGCN(BasicModel):
         print(f"lgn is already to go(dropout:{self.config['dropout']})")
 
         # print("save_txt")
+
+    # 实现了对输入矩阵稀疏化的dropout操作
     def __dropout_x(self, x, keep_prob):
         size = x.size()
         index = x.indices().t()
@@ -127,7 +131,8 @@ class LightGCN(BasicModel):
         values = values[random_index]/keep_prob
         g = torch.sparse.FloatTensor(index.t(), values, size)
         return g
-    
+
+    # 根据配置选择是否执行dropout操作
     def __dropout(self, keep_prob):
         if self.A_split:
             graph = []
@@ -136,7 +141,8 @@ class LightGCN(BasicModel):
         else:
             graph = self.__dropout_x(self.Graph, keep_prob)
         return graph
-    
+
+    # 实现了LightGCN模型的前向传播过程
     def computer(self):
         """
         propagate methods for lightGCN
@@ -170,14 +176,16 @@ class LightGCN(BasicModel):
         light_out = torch.mean(embs, dim=1)
         users, items = torch.split(light_out, [self.num_users, self.num_items])
         return users, items
-    
+
+    # 根据用户和物品的嵌入计算评分
     def getUsersRating(self, users):
         all_users, all_items = self.computer()
         users_emb = all_users[users.long()]
         items_emb = all_items
         rating = self.f(torch.matmul(users_emb, items_emb.t()))
         return rating
-    
+
+    # 获取用户、正样本物品和负样本物品的嵌入
     def getEmbedding(self, users, pos_items, neg_items):
         all_users, all_items = self.computer()
         users_emb = all_users[users]
@@ -187,7 +195,8 @@ class LightGCN(BasicModel):
         pos_emb_ego = self.embedding_item(pos_items)
         neg_emb_ego = self.embedding_item(neg_items)
         return users_emb, pos_emb, neg_emb, users_emb_ego, pos_emb_ego, neg_emb_ego
-    
+
+    # 计算Bayesian Personalized Ranking（BPR）损失
     def bpr_loss(self, users, pos, neg):
         (users_emb, pos_emb, neg_emb, 
         userEmb0,  posEmb0, negEmb0) = self.getEmbedding(users.long(), pos.long(), neg.long())
@@ -202,7 +211,8 @@ class LightGCN(BasicModel):
         loss = torch.mean(torch.nn.functional.softplus(neg_scores - pos_scores))
         
         return loss, reg_loss
-       
+
+    # 实现了模型的前向传播，计算用户和物品之间的关联度
     def forward(self, users, items):
         # compute embedding
         all_users, all_items = self.computer()
@@ -210,6 +220,6 @@ class LightGCN(BasicModel):
         #all_users, all_items = self.computer()
         users_emb = all_users[users]
         items_emb = all_items[items]
-        inner_pro = torch.mul(users_emb, items_emb)
+        inner_pro = torch.mul(users_emb, items_emb)  #对应元素相乘
         gamma     = torch.sum(inner_pro, dim=1)
         return gamma

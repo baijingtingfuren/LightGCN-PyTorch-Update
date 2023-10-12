@@ -107,14 +107,16 @@ class LastFM(BasicDataset):
         # (users,items), bipartite graph
         self.UserItemNet  = csr_matrix((np.ones(len(self.trainUser)), (self.trainUser, self.trainItem) ), shape=(self.n_users,self.m_items)) 
         
-        # pre-calculate
+        # pre-calculate正样本
         self._allPos = self.getUserPosItems(list(range(self.n_users)))
+        # 负样本
         self.allNeg = []
         allItems    = set(range(self.m_items))
         for i in range(self.n_users):
             pos = set(self._allPos[i])
             neg = allItems - pos
             self.allNeg.append(np.array(list(neg)))
+        #构建测试集字典
         self.__testDict = self.__build_test()
 
     @property
@@ -137,16 +139,19 @@ class LastFM(BasicDataset):
     def allPos(self):
         return self._allPos
 
+    # 据用户 - 物品的连接关系生成稀疏图数据，并进行归一化处理
     def getSparseGraph(self):
         if self.Graph is None:
             user_dim = torch.LongTensor(self.trainUser)
             item_dim = torch.LongTensor(self.trainItem)
-            
+            # 用户到物品和物品到物品的连接关系
             first_sub = torch.stack([user_dim, item_dim + self.n_users])
             second_sub = torch.stack([item_dim+self.n_users, user_dim])
             index = torch.cat([first_sub, second_sub], dim=1)
             data = torch.ones(index.size(-1)).int()
+            # 稀疏整型张量形状为[self.n_users+self.m_items, self.n_users+self.m_items]
             self.Graph = torch.sparse.IntTensor(index, data, torch.Size([self.n_users+self.m_items, self.n_users+self.m_items]))
+            # 将self.Graph转换为稠密张量形式
             dense = self.Graph.to_dense()
             D = torch.sum(dense, dim=1).float()
             D[D==0.] = 1.
@@ -237,23 +242,23 @@ class Loader(BasicDataset):
         testUniqueUsers, testItem, testUser = [], [], []
         self.traindataSize = 0
         self.testDataSize = 0
-
+        # 处理train.txt中的训练集数据，主要结果为trainUniqueUsers，trainUser，trainItem三个数据
         with open(train_file) as f:
             for l in f.readlines():
                 if len(l) > 0:
-                    l = l.strip('\n').split(' ')
-                    items = [int(i) for i in l[1:]]
-                    uid = int(l[0])
+                    l = l.strip('\n').split(' ')   #取出每一行的数据l，第一列是用户id
+                    items = [int(i) for i in l[1:]]  #l中除去用户id之外的数字为物品id，存储到item中
+                    uid = int(l[0])   #l中第一个数据是用户id
                     trainUniqueUsers.append(uid)
                     trainUser.extend([uid] * len(items))
                     trainItem.extend(items)
-                    self.m_item = max(self.m_item, max(items))
-                    self.n_user = max(self.n_user, uid)
-                    self.traindataSize += len(items)
+                    self.m_item = max(self.m_item, max(items)) #当前物品 ID 的最大值
+                    self.n_user = max(self.n_user, uid)  #当前用户 ID 的最大值
+                    self.traindataSize += len(items)   #训练数据的大小
         self.trainUniqueUsers = np.array(trainUniqueUsers)
         self.trainUser = np.array(trainUser)
         self.trainItem = np.array(trainItem)
-
+        # 处理test.txt中的训练集数据，主要结果为testUniqueUsers，testUser，testItem三个数据
         with open(test_file) as f:
             for l in f.readlines():
                 if len(l) > 0:
@@ -277,15 +282,15 @@ class Loader(BasicDataset):
         print(f"{self.testDataSize} interactions for testing")
         print(f"{world.dataset} Sparsity : {(self.trainDataSize + self.testDataSize) / self.n_users / self.m_items}")
 
-        # (users,items), bipartite graph
+        # (users,items), bipartite graph  构建一个基于稀疏矩阵的用户-物品关系网络
         self.UserItemNet = csr_matrix((np.ones(len(self.trainUser)), (self.trainUser, self.trainItem)),
                                       shape=(self.n_user, self.m_item))
-        self.users_D = np.array(self.UserItemNet.sum(axis=1)).squeeze()
+        self.users_D = np.array(self.UserItemNet.sum(axis=1)).squeeze() #度数
         self.users_D[self.users_D == 0.] = 1
         self.items_D = np.array(self.UserItemNet.sum(axis=0)).squeeze()
         self.items_D[self.items_D == 0.] = 1.
         # pre-calculate
-        self._allPos = self.getUserPosItems(list(range(self.n_user)))
+        self._allPos = self.getUserPosItems(list(range(self.n_user)))  #每个用户的正样本物品
         self.__testDict = self.__build_test()
         print(f"{world.dataset} is ready to go")
 
